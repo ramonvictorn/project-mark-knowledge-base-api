@@ -1,8 +1,9 @@
 export enum UserRole {
-  Admin = "ADMIN",
-  Editor = "EDITOR",
   Viewer = "VIEWER",
+  Editor = "EDITOR",
+  Admin = "ADMIN",
 }
+
 
 export interface User {
   id: string;
@@ -10,4 +11,4 @@ export interface User {
   email: string;
   role: UserRole;
   createdAt: Date;
-} 
+}
