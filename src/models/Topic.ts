@@ -1,9 +1,12 @@
 export interface Topic {
-  id: string;
-  name: string;
-  content: string;
-  createdAt: Date;
-  updatedAt: Date;
-  version: number;
+  versionId: string;
+  topicId: string;
   parentTopicId?: string;
+  parentVersionId?: string;
+  isLatestVersion: boolean;
+  version: number;
+  content: string;
+  name: string;
+  updatedAt: Date;
+  createdAt: Date;
 }
