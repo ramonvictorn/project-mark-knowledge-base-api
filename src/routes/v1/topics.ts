@@ -9,6 +9,7 @@ import {
   updateTopicSchema,
 } from "./validation/topics";
 import { validateData } from "../../middleware/validation.middleware";
+import { NotFoundError } from "../../middleware/route.middleware";
 
 const router = express.Router();
 
@@ -53,12 +54,9 @@ router.get(
     const topic = await topicService.getTopicById(req.params.id, version);
 
     if (!topic) {
-      const errorResponse: ErrorResponse = {
-        error: "Topic not found",
-      };
-      res.status(404).json(errorResponse);
-      return;
+      throw new NotFoundError("Topic not found");
     }
+
     res.json(topic);
   }
 );

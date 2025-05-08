@@ -13,7 +13,8 @@ export class UserService {
   async createUser(userData: { name: string; email: string; role: UserRole }): Promise<User> {
     return usersRepository.create({
       ...userData,
-      createdAt: new Date()
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
   }
 

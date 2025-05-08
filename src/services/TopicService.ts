@@ -1,4 +1,5 @@
-import { Topic } from "../models/Topic";
+import { BadRequestError } from "../middleware/route.middleware";
+import { ITopic, Topic } from "../models/Topic";
 import { topicsRepository } from "../repositories";
 import { CreateTopic } from "../repositories/types";
 import {
@@ -20,9 +21,9 @@ export class TopicService {
 
     const topics = await topicsRepository.findAll();
 
-    type TreeNode = Partial<Topic> & { children: TreeNode[] };
+    type TreeNode = Partial<ITopic> & { children: TreeNode[] };
 
-    const buildTree = (currentParent: Topic): TreeNode => {
+    const buildTree = (currentParent: ITopic): TreeNode => {
       const childTopics = topics.filter(
         (topic) =>
           topic.parentTopicId === currentParent.topicId && topic.isLatestVersion
@@ -48,11 +49,11 @@ export class TopicService {
     return topicsRepository.findLastVersion(id);
   }
 
-  async createTopic(topicData: CreateTopicPayload): Promise<Topic> {
-    const createTopicData: CreateTopic = {
+  async createTopic(topicData: CreateTopicPayload): Promise<ITopic> {
+    const topicToCreated = new Topic({
       name: topicData.name,
       content: topicData.content,
-    };
+    });
 
     if (topicData.parentTopicId) {
       const parentTopic = await topicsRepository.findLastVersion(
@@ -60,14 +61,13 @@ export class TopicService {
       );
 
       if (!parentTopic) {
-        throw new Error("Parent topic not found");
+        throw new BadRequestError("Parent topic not found");
       }
 
-      createTopicData.parentTopicId = parentTopic.topicId;
-      createTopicData.parentVersionId = parentTopic.versionId;
+      topicToCreated.addParent(parentTopic);
     }
 
-    return topicsRepository.create(createTopicData);
+    return topicsRepository.create(topicToCreated);
   }
 
   async updateTopic(
@@ -122,7 +122,7 @@ export class TopicService {
   async findShortestPath(sourceTopicId: string, targetTopicId: string) {
     const topics = await topicsRepository.findAllLastVersion();
 
-    const topicMap = new Map<string, Topic>();
+    const topicMap = new Map<string, ITopic>();
     topics.forEach((topic) => {
       topicMap.set(topic.topicId, topic);
     });
@@ -142,7 +142,7 @@ export class TopicService {
       throw new Error("Source or target without parent topic to be connected");
     }
 
-    const queue: { topic: Topic; path: Topic[] }[] = [];
+    const queue: { topic: ITopic; path: ITopic[] }[] = [];
     const visited = new Set<string>();
 
     queue.push({ topic: sourceTopic, path: [sourceTopic] });
@@ -151,7 +151,7 @@ export class TopicService {
     while (queue.length > 0) {
       const { topic, path } = queue.shift()!;
 
-      const topicsToVerify: Topic[] = [];
+      const topicsToVerify: ITopic[] = [];
 
       if (topic.parentTopicId) {
         const parent = topicMap.get(topic.parentTopicId);

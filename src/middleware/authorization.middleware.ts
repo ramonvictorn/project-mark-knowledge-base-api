@@ -1,22 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import { UserRole } from "../models/User";
 import { userService } from "../services";
 import { AuthenticatedRequest } from "./types";
-
-export const mappedRolesToNumber: Record<UserRole, number> = {
-  [UserRole.Viewer]: 1,
-  [UserRole.Editor]: 10,
-  [UserRole.Admin]: 20,
-};
-
-export type Action = "READ" | "WRITE" | "DELETE" | "GRANT_ACCESS";
-
-const minimumRoleByAction: Record<Action, number> = {
-  READ: mappedRolesToNumber.VIEWER,
-  WRITE: mappedRolesToNumber.EDITOR,
-  DELETE: mappedRolesToNumber.ADMIN,
-  GRANT_ACCESS: mappedRolesToNumber.ADMIN,
-};
+import { Action, RoleStrategyFactory } from "../users/userRoleStrategy";
+import { ForbiddenError, UnauthorizedError } from "./route.middleware";
 
 export const isAuthorizedUser =
   (action: Action) =>
@@ -24,22 +10,22 @@ export const isAuthorizedUser =
     const userId = req.headers["user-id"];
 
     if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
+      throw new UnauthorizedError("Unauthorized");
     }
-
     const user = await userService.getUserById(userId as string);
 
     if (!user) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
+      throw new UnauthorizedError("Unauthorized");
     }
 
     (req as AuthenticatedRequest).user = user;
+    const roleStrategy = RoleStrategyFactory.createStrategy(user.role);
 
-    if (mappedRolesToNumber[user.role] >= minimumRoleByAction[action]) {
+    if (roleStrategy.canDoAction(action)) {
       next();
     } else {
-      res.status(401).json({ error: "Unauthorized" });
+      throw new ForbiddenError(
+        "User does not have permission to do this action"
+      );
     }
   };

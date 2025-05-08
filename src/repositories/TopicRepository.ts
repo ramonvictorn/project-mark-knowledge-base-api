@@ -1,6 +1,6 @@
-import { v4 as uuidv4 } from "uuid";
 import { redisClient } from "../config/redis";
-import { Topic } from "../models/Topic";
+import { NotFoundError } from "../middleware/route.middleware";
+import { ITopic, Topic } from "../models/Topic";
 import { BaseRepository } from "./BaseRepository";
 import { CreateTopic } from "./types";
 
@@ -16,23 +16,23 @@ export class TopicRepository implements BaseRepository<Topic> {
       const jsonData = await redisClient.get(key);
       if (jsonData) {
         const topic = this.deserializeTopic(jsonData);
-        topics.push(topic);
+        topics.push(new Topic(topic));
       }
     }
 
     return topics;
   }
 
-  async findLastVersion(topicId: string): Promise<Topic | null> {
+  async findLastVersion(topicId: string) {
     const allTopics = await this.findAll();
-
+    // TODO: CAN BE IMPROVED WITH FIND + ISLAST VERSION
     const topicVersions = allTopics
       .filter((topic) => topic.topicId === topicId)
       .sort((a, b) => a.version - b.version);
 
     if (topicVersions.length === 0) return null;
 
-    return topicVersions[topicVersions.length - 1];
+    return new Topic(topicVersions[topicVersions.length - 1]);
   }
 
   async findByVersion(
@@ -45,13 +45,23 @@ export class TopicRepository implements BaseRepository<Topic> {
       (topic) => topic.topicId === topicId && topic.version === versionNumber
     );
 
-    return topic ?? null;
+    return topic ? new Topic(topic) : null;
+  }
+
+  async findTopicVersions(topicId: string): Promise<Topic[] | null> {
+    const allTopics = await this.findAll();
+
+    const topic = allTopics.filter((topic) => topic.topicId === topicId);
+
+    return topic.map((topic) => new Topic(topic));
   }
 
   async findAllLastVersion(): Promise<Topic[]> {
     const allTopics = await this.findAll();
 
-    return allTopics.filter((topic) => topic.isLatestVersion);
+    return allTopics
+      .filter((topic) => topic.isLatestVersion)
+      .map((topic) => new Topic(topic));
   }
 
   async findByVersionId(versionId: string): Promise<Topic | null> {
@@ -60,42 +70,33 @@ export class TopicRepository implements BaseRepository<Topic> {
     const topic = allTopics.find((topic) => topic.versionId === versionId);
 
     if (!topic) {
-      throw new Error("Topic not found");
+      throw new NotFoundError("Topic not found");
     }
 
-    return topic;
+    return new Topic(topic);
   }
 
   async create(topicData: CreateTopic): Promise<Topic> {
-    const versionId = uuidv4();
-    const topicId = topicData.topicId ?? uuidv4();
-    const now = new Date();
-
-    const topic: Topic = {
+    const topic = new Topic({
       ...topicData,
-      version: topicData.version ?? 1,
       isLatestVersion: true,
-      topicId,
-      versionId,
-      createdAt: now,
-      updatedAt: now,
-    };
+    });
 
-    const key = `${this.keyPrefix}${versionId}`;
+    const key = `${this.keyPrefix}${topic.versionId}`;
     await redisClient.set(key, this.serializeTopic(topic));
 
-    return topic;
+    return new Topic(topic);
   }
 
   async update(
     versionId: string,
-    topicData: Partial<Topic>
+    topicData: Partial<ITopic>
   ): Promise<Topic | null> {
     const topic = await this.findByVersionId(versionId);
 
     if (!topic) return null;
 
-    const updatedTopic: Topic = {
+    const updatedTopic: ITopic = {
       ...topic,
       ...topicData,
       updatedAt: new Date(),
@@ -104,7 +105,7 @@ export class TopicRepository implements BaseRepository<Topic> {
     const key = `${this.keyPrefix}${versionId}`;
     await redisClient.set(key, this.serializeTopic(updatedTopic));
 
-    return updatedTopic;
+    return new Topic(updatedTopic);
   }
 
   async delete(versionId: string): Promise<boolean> {
@@ -114,7 +115,15 @@ export class TopicRepository implements BaseRepository<Topic> {
     return result === 1;
   }
 
-  private serializeTopic(topic: Topic): string {
+  async findAllChildren(topicId: string): Promise<Topic[]> {
+    const allTopics = await this.findAll();
+
+    const topics = allTopics.filter((topic) => topic.parentTopicId === topicId);
+
+    return topics.map((topic) => new Topic(topic));
+  }
+
+  private serializeTopic(topic: ITopic): string {
     return JSON.stringify({
       ...topic,
       createdAt: topic.createdAt.toISOString(),
@@ -124,10 +133,10 @@ export class TopicRepository implements BaseRepository<Topic> {
 
   private deserializeTopic(jsonData: string): Topic {
     const data = JSON.parse(jsonData);
-    return {
+    return new Topic({
       ...data,
       createdAt: new Date(data.createdAt),
       updatedAt: new Date(data.updatedAt),
-    };
+    });
   }
 }
