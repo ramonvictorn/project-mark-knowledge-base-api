@@ -108,8 +108,8 @@ npm run start:dev
 
 ## API Endpoints
 
-
 ### Authentication
+
 All endpoints are protected, and you need to pass a simple header:  
 `user-id`
 
@@ -148,12 +148,8 @@ src/
 
 1. **Code Quality**
 
-   - [ ] Split part of the logic into separate methods (buildTree, ..) and add unit tests on them.
-   - Tests on repository and service layer.
+   - [ ] Split part of the logic into separate methods (buildTree,findShortestPath, ..) and add unit tests on them.
+   - [ ]Tests on repository and service layer.
    - [ ] Optimize database queries
    - [ ] Add pagination for list endpoints
    - [ ] Implement search functionality
-
-
-
-
