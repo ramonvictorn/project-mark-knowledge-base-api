@@ -1,4 +1,4 @@
-import { BadRequestError } from "../middleware/route.middleware";
+import { BadRequestError, NotFoundError } from "../middleware/route.middleware";
 import { ITopic, Topic } from "../models/Topic";
 import { topicsRepository } from "../repositories";
 import { CreateTopic } from "../repositories/types";
@@ -16,7 +16,7 @@ export class TopicService {
     const mainParentTopic = await topicsRepository.findLastVersion(topicId);
 
     if (!mainParentTopic) {
-      throw new Error("Parent topic not found");
+      throw new NotFoundError("Parent topic not found");
     }
 
     const topics = await topicsRepository.findAll();
@@ -74,22 +74,22 @@ export class TopicService {
     topicId: string,
     topicData: UpdateTopicPayload
   ): Promise<Topic | null> {
-    const latestTopic = await topicsRepository.findLastVersion(topicId);
-    // TODO: return error if topic is not found
+    const allTopicVersions = await topicsRepository.findTopicVersions(topicId);
+    const latestTopic = allTopicVersions?.find(
+      (topic) => topic.isLatestVersion
+    );
+
     if (!latestTopic) {
-      return null;
+      throw new NotFoundError("Topic not found");
     }
 
     if (!latestTopic.isLatestVersion) {
-      return null;
+      throw new BadRequestError("Topic is not the latest version");
     }
 
-    const updatedExistingTopic = {
-      ...latestTopic,
+    await topicsRepository.update(latestTopic.versionId, {
       isLatestVersion: false,
-    };
-
-    await topicsRepository.update(latestTopic.versionId, updatedExistingTopic);
+    });
 
     const newTopicData: CreateTopic = {
       name: topicData.name ?? latestTopic.name,
@@ -98,12 +98,27 @@ export class TopicService {
       topicId: latestTopic.topicId,
     };
 
-    const parentTopicId = topicData.parentTopicId ?? latestTopic.parentTopicId;
-    if (parentTopicId) {
-      const parentTopic = await topicsRepository.findLastVersion(parentTopicId);
+    const currentParentTopicId = latestTopic.parentTopicId;
+    const newParentTopicId = topicData.parentTopicId;
+
+    let parentTopicIdToUse: string | null | undefined =
+      newParentTopicId ?? currentParentTopicId;
+    const removeParentTopicId =
+      newParentTopicId === null && !!currentParentTopicId;
+
+    if (removeParentTopicId) {
+      parentTopicIdToUse = null;
+    }
+
+    const needToReassignVersions = currentParentTopicId !== parentTopicIdToUse;
+
+    if (parentTopicIdToUse) {
+      const parentTopic = await topicsRepository.findLastVersion(
+        parentTopicIdToUse
+      );
 
       if (!parentTopic) {
-        throw new Error("Parent topic not found");
+        throw new NotFoundError("Parent topic not found");
       }
 
       newTopicData.parentTopicId = parentTopic.topicId;
@@ -112,11 +127,53 @@ export class TopicService {
 
     const newTopic = await topicsRepository.create(newTopicData);
 
+    if (needToReassignVersions) {
+      allTopicVersions?.forEach(async (topic) => {
+        await topicsRepository.update(topic.versionId, {
+          parentTopicId: newTopic.parentTopicId,
+          parentVersionId: newTopic.versionId,
+        });
+      });
+    }
+
     return newTopic;
   }
 
   async deleteTopic(id: string): Promise<boolean> {
-    return topicsRepository.delete(id);
+    const topicVersionsToDelete = await topicsRepository.findTopicVersions(id);
+
+    if (!topicVersionsToDelete?.length) {
+      throw new NotFoundError("Topic not found");
+    }
+
+    const parentOfTopicToDelete = topicVersionsToDelete[0].parentTopicId
+      ? await topicsRepository.findLastVersion(
+          topicVersionsToDelete[0].parentTopicId
+        )
+      : null;
+
+    const children = await topicsRepository.findAllChildren(id);
+
+    const newParentChildren = parentOfTopicToDelete ?? children[0];
+
+    const reassignmentQueue: Topic[] = [...children];
+
+    while (reassignmentQueue.length > 0) {
+      const topic = reassignmentQueue.shift();
+
+      if (topic) {
+        await topicsRepository.update(topic.versionId, {
+          parentTopicId: newParentChildren.topicId,
+          parentVersionId: newParentChildren.versionId,
+        });
+      }
+    }
+
+    topicVersionsToDelete.forEach(async (topic) => {
+      await topicsRepository.delete(topic.versionId);
+    });
+
+    return true;
   }
 
   async findShortestPath(sourceTopicId: string, targetTopicId: string) {
@@ -131,7 +188,7 @@ export class TopicService {
     const targetTopic = topicMap.get(targetTopicId);
 
     if (!sourceTopic || !targetTopic) {
-      throw new Error("Source or target topic not found");
+      throw new NotFoundError("Source or target topic not found");
     }
 
     if (sourceTopicId === targetTopicId) {
@@ -139,7 +196,9 @@ export class TopicService {
     }
 
     if (!sourceTopic.parentTopicId && !targetTopic.parentTopicId) {
-      throw new Error("Source or target without parent topic to be connected");
+      throw new NotFoundError(
+        "Source or target without parent topic to be connected"
+      );
     }
 
     const queue: { topic: ITopic; path: ITopic[] }[] = [];
@@ -175,6 +234,6 @@ export class TopicService {
       }
     }
 
-    throw new Error("No path found between source and target topics");
+    throw new NotFoundError("No path found between source and target topics");
   }
 }
