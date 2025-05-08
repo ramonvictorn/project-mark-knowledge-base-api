@@ -1,0 +1,71 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/dist
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - redis_network
+    command: sh -c "npm install && npm run start:dev"
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 15mb
+    networks:
+      - redis_network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 60M
+        reservations:
+          cpus: "0.5"
+          memory: 30M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - redis_network
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    ports:
+      - "5540:5540"
+    networks:
+      - redis_network
+    depends_on:
+      redis:
+        condition: service_healthy
+
+networks:
+  redis_network:
+    driver: bridge
+
+volumes:
+  redis_data:

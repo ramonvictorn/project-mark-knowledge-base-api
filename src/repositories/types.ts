@@ -1,4 +1,4 @@
-import { CreateTopicPayload } from "../routes/v1/topics.types";
+import { CreateTopicPayload } from "../routes/v1/validation/topics";
 
 export type CreateTopic = CreateTopicPayload & {
   parentTopicId?: string;

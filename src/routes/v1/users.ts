@@ -1,7 +1,8 @@
 import { Request, Response, Router } from "express";
 import { userService } from "../../services";
-import { UserRole } from "../../models/User";
 import { isAuthorizedUser } from "../../middleware/authorization.middleware";
+import { validateData } from "../../middleware/validation.middleware";
+import { CreateUserPayload, createUserSchema } from "./validation/users";
 
 const router: Router = Router();
 
@@ -39,27 +40,17 @@ router.get(
 
 router.post(
   "/",
-  isAuthorizedUser("GRANT_ACCESS"),
-  async (req: Request, res: Response) => {
-    try {
-      const { name, email, role } = req.body;
-
-      if (!name || !email || !role) {
-        res.status(400).json({ error: "Missing required fields" });
-        return;
-      }
-
-      if (!Object.values(UserRole).includes(role)) {
-        res.status(400).json({ error: "Invalid role" });
-        return;
-      }
-
-      const user = await userService.createUser({ name, email, role });
-      res.status(201).json(user);
-    } catch (err) {
-      console.error("Error creating user:", err);
-      res.status(500).json({ error: "Failed to create user" });
-    }
+  validateData(createUserSchema),
+  async (
+    req: Request<
+      Record<string, never>,
+      Record<string, never>,
+      CreateUserPayload
+    >,
+    res: Response
+  ) => {
+    const user = await userService.createUser(req);
+    res.status(201).json(user);
   }
 );
 
