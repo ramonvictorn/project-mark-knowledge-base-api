@@ -108,6 +108,13 @@ npm run start:dev
 
 ## API Endpoints
 
+
+### Authentication
+All endpoints are protected, and you need to pass a simple header:  
+`user-id`
+
+Is the ID of one existent user. To create the first user you don't need this header, only for the next one and need to be with the role admin
+
 ### Topics
 
 - `POST /v1/topics` - Create a new topic
@@ -139,28 +146,14 @@ src/
 
 ## Improvements To Be Done
 
-1. **Error Handling & Validation**
+1. **Code Quality**
 
-   - [ ] Create centralized error handling
-   - [ ] Add request validation middleware
-   - [ ] Implement proper error logging
-   - [ ] Add input sanitization
-
-3. **Testing**
-
-   - [ ] Add integration tests
-   - [ ] Add unit tests for services
-
-4. **Performance**
-
+   - [ ] Split part of the logic into separate methods (buildTree, ..) and add unit tests on them.
+   - Tests on repository and service layer.
    - [ ] Optimize database queries
-
-5. **Code Quality**
-
-   - [ ]
-
-6. **API Features**
    - [ ] Add pagination for list endpoints
    - [ ] Implement search functionality
-   - [ ] Add filtering and sorting options
-   - [ ] Add bulk operations
+
+
+
+
