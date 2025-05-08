@@ -149,7 +149,7 @@ src/
 1. **Code Quality**
 
    - [ ] Split part of the logic into separate methods (buildTree,findShortestPath, ..) and add unit tests on them.
-   - [ ]Tests on repository and service layer.
+   - [ ] Tests on repository and service layer.
    - [ ] Optimize database queries
    - [ ] Add pagination for list endpoints
    - [ ] Implement search functionality
