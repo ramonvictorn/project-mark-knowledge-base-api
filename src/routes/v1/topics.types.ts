@@ -1,15 +1,3 @@
-export interface CreateTopicPayload {
-  name: string;
-  content: string;
-  parentTopicId?: string;
-}
-
-export interface UpdateTopicPayload {
-  name: string;
-  content: string;
-  parentTopicId?: string;
-}
-
 export interface TopicResponse {
   id: string;
   name: string;

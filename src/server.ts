@@ -1,5 +1,6 @@
 import express from "express";
 import routes from "./routes";
+import { errorHandler } from "./middleware/route.middleware";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -11,6 +12,8 @@ app.get("/", (req, res) => {
 });
 
 app.use("/", routes);
+
+app.use(errorHandler);
 
 export const startServer = () => {
   app.listen(port, () => {

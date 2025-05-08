@@ -4,7 +4,7 @@ import { CreateTopic } from "../repositories/types";
 import {
   CreateTopicPayload,
   UpdateTopicPayload,
-} from "../routes/v1/topics.types";
+} from "../routes/v1/validation/topics";
 
 export class TopicService {
   async getAllTopics(): Promise<Topic[]> {
@@ -37,7 +37,10 @@ export class TopicService {
     return buildTree(mainParentTopic);
   }
 
-  async getTopicById(id: string, versionNumber?: number): Promise<Topic | null> {
+  async getTopicById(
+    id: string,
+    versionNumber?: number
+  ): Promise<Topic | null> {
     if (versionNumber) {
       return topicsRepository.findByVersion(id, versionNumber);
     }
